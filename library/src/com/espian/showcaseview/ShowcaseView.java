@@ -1,5 +1,6 @@
 package com.espian.showcaseview;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -28,6 +29,8 @@ import android.widget.RelativeLayout;
 import com.espian.showcaseview.actionbar.ActionBarViewWrapper;
 import com.espian.showcaseview.actionbar.reflection.BaseReflector;
 import com.espian.showcaseview.anim.AnimationUtils;
+import com.espian.showcaseview.anim.AnimationUtils.AnimationEndListener;
+import com.espian.showcaseview.anim.AnimationUtils.AnimationStartListener;
 import com.espian.showcaseview.drawing.ClingDrawer;
 import com.espian.showcaseview.drawing.ClingDrawerImpl;
 import com.espian.showcaseview.drawing.TextDrawer;
@@ -38,60 +41,56 @@ import com.espian.showcaseview.utils.PointAnimator;
 import com.github.espiandev.showcaseview.R;
 import com.nineoldandroids.animation.Animator;
 
-import static com.espian.showcaseview.anim.AnimationUtils.AnimationEndListener;
-import static com.espian.showcaseview.anim.AnimationUtils.AnimationStartListener;
-
 /**
  * A view which allows you to showcase areas of your app with an explanation.
  */
-public class ShowcaseView extends RelativeLayout
-        implements View.OnClickListener, View.OnTouchListener {
+public class ShowcaseView extends RelativeLayout implements View.OnClickListener, View.OnTouchListener {
 
-    public static final int TYPE_NO_LIMIT = 0;
-    public static final int TYPE_ONE_SHOT = 1;
+    public static final int           TYPE_NO_LIMIT           = 0;
+    public static final int           TYPE_ONE_SHOT           = 1;
 
-    public static final int INSERT_TO_DECOR = 0;
-    public static final int INSERT_TO_VIEW = 1;
+    public static final int           INSERT_TO_DECOR         = 0;
+    public static final int           INSERT_TO_VIEW          = 1;
 
-    public static final int ITEM_ACTION_HOME = 0;
-    public static final int ITEM_TITLE = 1;
-    public static final int ITEM_SPINNER = 2;
-    public static final int ITEM_ACTION_ITEM = 3;
-    public static final int ITEM_ACTION_OVERFLOW = 6;
+    public static final int           ITEM_ACTION_HOME        = 0;
+    public static final int           ITEM_TITLE              = 1;
+    public static final int           ITEM_SPINNER            = 2;
+    public static final int           ITEM_ACTION_ITEM        = 3;
+    public static final int           ITEM_ACTION_OVERFLOW    = 6;
 
-    protected static final String PREFS_SHOWCASE_INTERNAL = "showcase_internal";
-    public static final int INNER_CIRCLE_RADIUS = 94;
-    private static final Interpolator INTERPOLATOR = new AccelerateDecelerateInterpolator();
+    protected static final String     PREFS_SHOWCASE_INTERNAL = "showcase_internal";
+    public static final int           INNER_CIRCLE_RADIUS     = 94;
+    private static final Interpolator INTERPOLATOR            = new AccelerateDecelerateInterpolator();
 
-    private int showcaseX = -1;
-    private int showcaseY = -1;
-    private float showcaseRadius = -1;
-    private float metricScale = 1.0f;
-    private float legacyShowcaseX = -1;
-    private float legacyShowcaseY = -1;
-    private boolean isRedundant = false;
-    private boolean hasCustomClickListener = false;
-    private ConfigOptions mOptions;
-    private int mBackgroundColor;
-    private View mHandy;
-    private final Button mEndButton;
-    OnShowcaseEventListener mEventListener = OnShowcaseEventListener.NONE;
-    private boolean mAlteredText = false;
+    private int                       showcaseX               = -1;
+    private int                       showcaseY               = -1;
+    private float                     showcaseRadius          = -1;
+    private float                     metricScale             = 1.0f;
+    private float                     legacyShowcaseX         = -1;
+    private float                     legacyShowcaseY         = -1;
+    private boolean                   isRedundant             = false;
+    private boolean                   hasCustomClickListener  = false;
+    private ConfigOptions             mOptions;
+    private int                       mBackgroundColor;
+    private View                      mHandy;
+    private final Button              mEndButton;
+    OnShowcaseEventListener           mEventListener          = OnShowcaseEventListener.NONE;
+    private boolean                   mAlteredText            = false;
 
-    private final String buttonText;
+    private final String              buttonText;
 
-    private float scaleMultiplier = 1f;
-    private TextDrawer mTextDrawer;
-    private ClingDrawer mShowcaseDrawer;
+    private float                     scaleMultiplier         = 1f;
+    private TextDrawer                mTextDrawer;
+    private ClingDrawer               mShowcaseDrawer;
 
-    public static final Target NONE = new Target() {
-        @Override
-        public Point getPoint() {
-            return null;
-        }
-    };
+    public static final Target        NONE                    = new Target() {
+                                                                  @Override
+                                                                  public Point getPoint() {
+                                                                      return null;
+                                                                  }
+                                                              };
 
-    private boolean mHasNoTarget = false;
+    private boolean                   mHasNoTarget            = false;
 
     protected ShowcaseView(Context context) {
         this(context, null, R.styleable.CustomTheme_showcaseViewStyle);
@@ -101,20 +100,18 @@ public class ShowcaseView extends RelativeLayout
         super(context, attrs, defStyle);
 
         // Get the attributes for the ShowcaseView
-        final TypedArray styled = context.getTheme()
-                .obtainStyledAttributes(attrs, R.styleable.ShowcaseView, R.attr.showcaseViewStyle,
-                        R.style.ShowcaseView);
-        mBackgroundColor = styled
-                .getInt(R.styleable.ShowcaseView_sv_backgroundColor, Color.argb(128, 80, 80, 80));
-        int showcaseColor = styled
-                .getColor(R.styleable.ShowcaseView_sv_showcaseColor, Color.parseColor("#33B5E5"));
+        final TypedArray styled = context.getTheme().obtainStyledAttributes(attrs, R.styleable.ShowcaseView,
+                R.attr.showcaseViewStyle, R.style.ShowcaseView);
+        mBackgroundColor = styled.getInt(R.styleable.ShowcaseView_sv_backgroundColor, Color.argb(128, 80, 80, 80));
+        int showcaseColor = styled.getColor(R.styleable.ShowcaseView_sv_showcaseColor, Color.parseColor("#33B5E5"));
 
-        int titleTextAppearance = styled
-                .getResourceId(R.styleable.ShowcaseView_sv_titleTextAppearance,
-                        R.style.TextAppearance_ShowcaseView_Title);
-        int detailTextAppearance = styled
-                .getResourceId(R.styleable.ShowcaseView_sv_detailTextAppearance,
-                        R.style.TextAppearance_ShowcaseView_Detail);
+        int endButtonBackgroundColor = styled.getColor(R.styleable.ShowcaseView_sv_buttonBackgroundColor,
+                R.drawable.cling_button_bg);
+
+        int titleTextAppearance = styled.getResourceId(R.styleable.ShowcaseView_sv_titleTextAppearance,
+                R.style.TextAppearance_ShowcaseView_Title);
+        int detailTextAppearance = styled.getResourceId(R.styleable.ShowcaseView_sv_detailTextAppearance,
+                R.style.TextAppearance_ShowcaseView_Detail);
 
         buttonText = styled.getString(R.styleable.ShowcaseView_sv_buttonText);
         styled.recycle();
@@ -122,9 +119,13 @@ public class ShowcaseView extends RelativeLayout
         metricScale = getContext().getResources().getDisplayMetrics().density;
         mEndButton = (Button) LayoutInflater.from(context).inflate(R.layout.showcase_button, null);
 
+        mEndButton.setBackgroundColor(endButtonBackgroundColor);
+        // mEndButton.setBackground(null);
+
         mShowcaseDrawer = new ClingDrawerImpl(getResources(), showcaseColor);
 
-        // TODO: This isn't ideal, ClingDrawer and Calculator interfaces should be separate
+        // TODO: This isn't ideal, ClingDrawer and Calculator interfaces should
+        // be separate
         mTextDrawer = new TextDrawerImpl(metricScale, mShowcaseDrawer);
         mTextDrawer.setTitleStyling(context, titleTextAppearance);
         mTextDrawer.setDetailStyling(context, detailTextAppearance);
@@ -139,11 +140,11 @@ public class ShowcaseView extends RelativeLayout
     private void init() {
         setHardwareAccelerated(true);
 
-        boolean hasShot = getContext()
-                .getSharedPreferences(PREFS_SHOWCASE_INTERNAL, Context.MODE_PRIVATE)
-                .getBoolean("hasShot" + getConfigOptions().showcaseId, false);
+        boolean hasShot = getContext().getSharedPreferences(PREFS_SHOWCASE_INTERNAL, Context.MODE_PRIVATE).getBoolean(
+                "hasShot" + getConfigOptions().showcaseId, false);
         if (hasShot && mOptions.shotType == TYPE_ONE_SHOT) {
-            // The showcase has already been shot once, so we don't need to do anything
+            // The showcase has already been shot once, so we don't need to do
+            // anything
             setVisibility(View.GONE);
             isRedundant = true;
             return;
@@ -162,8 +163,7 @@ public class ShowcaseView extends RelativeLayout
                 lps.setMargins(margin, margin, margin, margin);
             }
             mEndButton.setLayoutParams(lps);
-            mEndButton.setText(
-                    buttonText != null ? buttonText : getResources().getString(R.string.ok));
+            mEndButton.setText(buttonText != null ? buttonText : getResources().getString(R.string.ok));
             if (!hasCustomClickListener) {
                 mEndButton.setOnClickListener(this);
             }
@@ -182,9 +182,11 @@ public class ShowcaseView extends RelativeLayout
 
     /**
      * Set the view to showcase
-     *
-     * @param view The {@link View} to showcase.
-     * @deprecated Use setShowcase with a {@link com.espian.showcaseview.targets.ViewTarget}
+     * 
+     * @param view
+     *            The {@link View} to showcase.
+     * @deprecated Use setShowcase with a
+     *             {@link com.espian.showcaseview.targets.ViewTarget}
      */
     @Deprecated
     public void setShowcaseView(final View view) {
@@ -197,7 +199,7 @@ public class ShowcaseView extends RelativeLayout
         view.post(new Runnable() {
             @Override
             public void run() {
-                //init();
+                // init();
                 Point viewPoint = Calculator.getShowcasePointFromView(view, getConfigOptions());
                 setShowcasePosition(viewPoint);
                 invalidate();
@@ -206,7 +208,8 @@ public class ShowcaseView extends RelativeLayout
     }
 
     /**
-     * @deprecated This will soon become private. Use setShowcase with a {@link com.espian.showcaseview.targets.PointTarget}
+     * @deprecated This will soon become private. Use setShowcase with a
+     *             {@link com.espian.showcaseview.targets.PointTarget}
      */
     @Deprecated
     public void setShowcasePosition(Point point) {
@@ -215,9 +218,11 @@ public class ShowcaseView extends RelativeLayout
 
     /**
      * Set a specific position to showcase
-     *
-     * @param x X co-ordinate
-     * @param y Y co-ordinate
+     * 
+     * @param x
+     *            X co-ordinate
+     * @param y
+     *            Y co-ordinate
      * @deprecated use setShowcase with a PointTarget
      */
     @Deprecated
@@ -227,7 +232,7 @@ public class ShowcaseView extends RelativeLayout
         }
         showcaseX = x;
         showcaseY = y;
-        //init();
+        // init();
         invalidate();
     }
 
@@ -259,7 +264,7 @@ public class ShowcaseView extends RelativeLayout
     }
 
     public boolean hasShowcaseView() {
-    	return (showcaseX != 1000000 && showcaseY != 1000000) || !mHasNoTarget;
+        return (showcaseX != 1000000 && showcaseY != 1000000) || !mHasNoTarget;
     }
 
     public void setShowcaseX(int x) {
@@ -279,39 +284,39 @@ public class ShowcaseView extends RelativeLayout
     }
 
     @Deprecated
-    public void setShowcaseItem(final int itemType, final int actionItemId,
-            final Activity activity) {
+    public void setShowcaseItem(final int itemType, final int actionItemId, final Activity activity) {
         post(new Runnable() {
             @Override
             public void run() {
                 BaseReflector reflector = BaseReflector.getReflectorForActivity(activity);
-                ViewParent p = reflector.getActionBarView(); //ActionBarView
+                ViewParent p = reflector.getActionBarView(); // ActionBarView
                 ActionBarViewWrapper wrapper = new ActionBarViewWrapper(p);
 
                 switch (itemType) {
-                    case ITEM_ACTION_HOME:
-                        setShowcaseView(reflector.getHomeButton());
-                        break;
-                    case ITEM_SPINNER:
-                        setShowcaseView(wrapper.getSpinnerView());
-                        break;
-                    case ITEM_TITLE:
-                        setShowcaseView(wrapper.getTitleView());
-                        break;
-                    case ITEM_ACTION_ITEM:
-                        setShowcaseView(wrapper.getActionItem(actionItemId));
-                        break;
-                    case ITEM_ACTION_OVERFLOW:
-                        View overflow = wrapper.getOverflowView();
-                        // This check essentially checks if we are on a device with a legacy menu key
-                        if (overflow != null) {
-                            setShowcaseView(wrapper.getOverflowView());
-                        } else {
-                            setShowcasePosition(getLegacyOverflowPoint());
-                        }
-                        break;
-                    default:
-                        Log.e("TAG", "Unknown item type");
+                case ITEM_ACTION_HOME:
+                    setShowcaseView(reflector.getHomeButton());
+                    break;
+                case ITEM_SPINNER:
+                    setShowcaseView(wrapper.getSpinnerView());
+                    break;
+                case ITEM_TITLE:
+                    setShowcaseView(wrapper.getTitleView());
+                    break;
+                case ITEM_ACTION_ITEM:
+                    setShowcaseView(wrapper.getActionItem(actionItemId));
+                    break;
+                case ITEM_ACTION_OVERFLOW:
+                    View overflow = wrapper.getOverflowView();
+                    // This check essentially checks if we are on a device with
+                    // a legacy menu key
+                    if (overflow != null) {
+                        setShowcaseView(wrapper.getOverflowView());
+                    } else {
+                        setShowcasePosition(getLegacyOverflowPoint());
+                    }
+                    break;
+                default:
+                    Log.e("TAG", "Unknown item type");
                 }
             }
         });
@@ -327,8 +332,9 @@ public class ShowcaseView extends RelativeLayout
 
     /**
      * Override the standard button click event
-     *
-     * @param listener Listener to listen to on click events
+     * 
+     * @param listener
+     *            Listener to listen to on click events
      */
     public void overrideButtonClick(OnClickListener listener) {
         if (isRedundant) {
@@ -358,19 +364,20 @@ public class ShowcaseView extends RelativeLayout
         }
     }
 
+    @SuppressLint("NewApi")
     public void setHardwareAccelerated(boolean accelerated) {
         if (accelerated) {
-			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-				if (isHardwareAccelerated()) {
-					Paint hardwarePaint = new Paint();
-					hardwarePaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.OVERLAY));
-					setLayerType(LAYER_TYPE_HARDWARE, hardwarePaint);
-				} else {
-					setLayerType(LAYER_TYPE_SOFTWARE, null);
-				}
-			} else {
-				setDrawingCacheEnabled(true);
-			}
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+                if (isHardwareAccelerated()) {
+                    Paint hardwarePaint = new Paint();
+                    hardwarePaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.OVERLAY));
+                    setLayerType(LAYER_TYPE_HARDWARE, hardwarePaint);
+                } else {
+                    setLayerType(LAYER_TYPE_SOFTWARE, null);
+                }
+            } else {
+                setDrawingCacheEnabled(true);
+            }
         } else {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
                 setLayerType(LAYER_TYPE_SOFTWARE, null);
@@ -392,12 +399,12 @@ public class ShowcaseView extends RelativeLayout
         mAlteredText = false;
 
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.HONEYCOMB && !mHasNoTarget) {
-        	Path path = new Path();
+            Path path = new Path();
             path.addCircle(showcaseX, showcaseY, showcaseRadius, Path.Direction.CW);
             canvas.clipPath(path, Op.DIFFERENCE);
         }
 
-        //Draw background color
+        // Draw background color
         canvas.drawColor(mBackgroundColor);
 
         // Draw the showcase drawable
@@ -416,31 +423,42 @@ public class ShowcaseView extends RelativeLayout
     }
 
     /**
-     * Adds an animated hand performing a gesture.
-     * All parameters passed to this method are relative to the center of the showcased view.
-     * @param offsetStartX  x-offset of the start position
-     * @param offsetStartY  y-offset of the start position
-     * @param offsetEndX    x-offset of the end position
-     * @param offsetEndY    y-offset of the end position
-     * @see com.espian.showcaseview.ShowcaseView#animateGesture(float, float, float, float, boolean)
+     * Adds an animated hand performing a gesture. All parameters passed to this
+     * method are relative to the center of the showcased view.
+     * 
+     * @param offsetStartX
+     *            x-offset of the start position
+     * @param offsetStartY
+     *            y-offset of the start position
+     * @param offsetEndX
+     *            x-offset of the end position
+     * @param offsetEndY
+     *            y-offset of the end position
+     * @see com.espian.showcaseview.ShowcaseView#animateGesture(float, float,
+     *      float, float, boolean)
      */
-    public void animateGesture(float offsetStartX, float offsetStartY, float offsetEndX,
-            float offsetEndY) {
+    public void animateGesture(float offsetStartX, float offsetStartY, float offsetEndX, float offsetEndY) {
         animateGesture(offsetStartX, offsetStartY, offsetEndX, offsetEndY, false);
     }
 
     /**
      * Adds an animated hand performing a gesture.
-     * @param startX                x-coordinate or x-offset of the start position
-     * @param startY                y-coordinate or x-offset of the start position
-     * @param endX                  x-coordinate or x-offset of the end position
-     * @param endY                  y-coordinate or x-offset of the end position
-     * @param absoluteCoordinates   If true, this will use absolute coordinates instead of coordinates relative to the center of the showcased view
+     * 
+     * @param startX
+     *            x-coordinate or x-offset of the start position
+     * @param startY
+     *            y-coordinate or x-offset of the start position
+     * @param endX
+     *            x-coordinate or x-offset of the end position
+     * @param endY
+     *            y-coordinate or x-offset of the end position
+     * @param absoluteCoordinates
+     *            If true, this will use absolute coordinates instead of
+     *            coordinates relative to the center of the showcased view
      */
-    public void animateGesture(float startX, float startY, float endX,
-            float endY, boolean absoluteCoordinates) {
-        mHandy = ((LayoutInflater) getContext().getSystemService(Context.LAYOUT_INFLATER_SERVICE))
-                .inflate(R.layout.handy, null);
+    public void animateGesture(float startX, float startY, float endX, float endY, boolean absoluteCoordinates) {
+        mHandy = ((LayoutInflater) getContext().getSystemService(Context.LAYOUT_INFLATER_SERVICE)).inflate(
+                R.layout.handy, null);
         addView(mHandy);
         moveHand(startX, startY, endX, endY, absoluteCoordinates, new AnimationEndListener() {
             @Override
@@ -450,26 +468,23 @@ public class ShowcaseView extends RelativeLayout
         });
     }
 
-    private void moveHand(float startX, float startY, float endX,
-            float endY, boolean absoluteCoordinates, AnimationEndListener listener) {
-        AnimationUtils.createMovementAnimation(mHandy, absoluteCoordinates?0:showcaseX,
-                absoluteCoordinates?0:showcaseY,
-                startX, startY,
-                endX, endY,
-                listener).start();
+    private void moveHand(float startX, float startY, float endX, float endY, boolean absoluteCoordinates,
+            AnimationEndListener listener) {
+        AnimationUtils.createMovementAnimation(mHandy, absoluteCoordinates ? 0 : showcaseX,
+                absoluteCoordinates ? 0 : showcaseY, startX, startY, endX, endY, listener).start();
     }
 
+    @SuppressLint("NewApi")
     @Override
     public void onClick(View view) {
         // If the type is set to one-shot, store that it has shot
         if (mOptions.shotType == TYPE_ONE_SHOT) {
-            SharedPreferences internal = getContext()
-                    .getSharedPreferences(PREFS_SHOWCASE_INTERNAL, Context.MODE_PRIVATE);
+            SharedPreferences internal = getContext().getSharedPreferences(PREFS_SHOWCASE_INTERNAL,
+                    Context.MODE_PRIVATE);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.GINGERBREAD) {
                 internal.edit().putBoolean("hasShot" + getConfigOptions().showcaseId, true).apply();
             } else {
-                internal.edit().putBoolean("hasShot" + getConfigOptions().showcaseId, true)
-                        .commit();
+                internal.edit().putBoolean("hasShot" + getConfigOptions().showcaseId, true).commit();
             }
         }
         hide();
@@ -478,8 +493,7 @@ public class ShowcaseView extends RelativeLayout
     public void hide() {
         mEventListener.onShowcaseViewHide(this);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB
-                && getConfigOptions().fadeOutDuration > 0) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB && getConfigOptions().fadeOutDuration > 0) {
             fadeOutShowcase();
         } else {
             setVisibility(View.GONE);
@@ -499,8 +513,7 @@ public class ShowcaseView extends RelativeLayout
 
     public void show() {
         mEventListener.onShowcaseViewShow(this);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB
-                && getConfigOptions().fadeInDuration > 0) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB && getConfigOptions().fadeInDuration > 0) {
             fadeInShowcase();
         } else {
             setVisibility(View.VISIBLE);
@@ -508,24 +521,27 @@ public class ShowcaseView extends RelativeLayout
     }
 
     private void fadeInShowcase() {
-        AnimationUtils.createFadeInAnimation(this, getConfigOptions().fadeInDuration,
-                new AnimationStartListener() {
-                    @Override
-                    public void onAnimationStart() {
-                        setVisibility(View.VISIBLE);
-                    }
-                }).start();
+        AnimationUtils.createFadeInAnimation(this, getConfigOptions().fadeInDuration, new AnimationStartListener() {
+            @Override
+            public void onAnimationStart() {
+                setVisibility(View.VISIBLE);
+            }
+        }).start();
     }
 
     @Override
     public boolean onTouch(View view, MotionEvent motionEvent) {
+        if (MotionEvent.ACTION_DOWN == motionEvent.getAction() && mOptions.hideOnClickOutside) {
+            this.performButtonClick();
+            return true;
+        }
 
         float xDelta = Math.abs(motionEvent.getRawX() - showcaseX);
         float yDelta = Math.abs(motionEvent.getRawY() - showcaseY);
         double distanceFromFocus = Math.sqrt(Math.pow(xDelta, 2) + Math.pow(yDelta, 2));
 
-        if (MotionEvent.ACTION_UP == motionEvent.getAction() &&
-            mOptions.hideOnClickOutside && distanceFromFocus > showcaseRadius) {
+        if (MotionEvent.ACTION_UP == motionEvent.getAction() && mOptions.hideOnClickOutside
+                && distanceFromFocus > showcaseRadius) {
             this.hide();
             return true;
         }
@@ -556,12 +572,12 @@ public class ShowcaseView extends RelativeLayout
 
     /**
      * Get the ghostly gesture hand for custom gestures
-     *
+     * 
      * @return a View representing the ghostly hand
      */
     public View getHand() {
-        final View mHandy = ((LayoutInflater) getContext()
-                .getSystemService(Context.LAYOUT_INFLATER_SERVICE)).inflate(R.layout.handy, null);
+        final View mHandy = ((LayoutInflater) getContext().getSystemService(Context.LAYOUT_INFLATER_SERVICE)).inflate(
+                R.layout.handy, null);
         addView(mHandy);
         AnimationUtils.hide(mHandy);
 
@@ -570,7 +586,9 @@ public class ShowcaseView extends RelativeLayout
 
     /**
      * Point to a specific view
-     * @param view The {@link View} to Showcase
+     * 
+     * @param view
+     *            The {@link View} to Showcase
      * @deprecated use pointTo(Target)
      */
     @Deprecated
@@ -582,9 +600,11 @@ public class ShowcaseView extends RelativeLayout
 
     /**
      * Point to a specific point on the screen
-     *
-     * @param x X-coordinate to point to
-     * @param y Y-coordinate to point to
+     * 
+     * @param x
+     *            X-coordinate to point to
+     * @param y
+     *            Y-coordinate to point to
      * @deprecated use pointTo(Target)
      */
     @Deprecated
@@ -595,7 +615,9 @@ public class ShowcaseView extends RelativeLayout
 
     /**
      * Point to a specific point on the screen
-     * @param target The target to point to
+     * 
+     * @param target
+     *            The target to point to
      * @deprecated use pointTo(Target)
      */
     public void pointTo(final Target target) {
@@ -604,8 +626,7 @@ public class ShowcaseView extends RelativeLayout
             public void run() {
                 mHandy = getHand();
                 Point targetPoint = target.getPoint();
-                AnimationUtils.createMovementAnimation(mHandy, targetPoint.x,
-                        targetPoint.y).start();
+                AnimationUtils.createMovementAnimation(mHandy, targetPoint.x, targetPoint.y).start();
             }
         });
     }
@@ -624,18 +645,22 @@ public class ShowcaseView extends RelativeLayout
 
     /**
      * Quick method to insert a ShowcaseView into an Activity
-     *
-     * @param viewToShowcase View to showcase
-     * @param activity       Activity to insert into
-     * @param title          Text to show as a title. Can be null.
-     * @param detailText     More detailed text. Can be null.
-     * @param options        A set of options to customise the ShowcaseView
+     * 
+     * @param viewToShowcase
+     *            View to showcase
+     * @param activity
+     *            Activity to insert into
+     * @param title
+     *            Text to show as a title. Can be null.
+     * @param detailText
+     *            More detailed text. Can be null.
+     * @param options
+     *            A set of options to customise the ShowcaseView
      * @return the created ShowcaseView instance
      * @deprecated use insertShowcaseView with {@link Target}
      */
     @Deprecated
-    public static ShowcaseView insertShowcaseView(View viewToShowcase, Activity activity,
-            String title,
+    public static ShowcaseView insertShowcaseView(View viewToShowcase, Activity activity, String title,
             String detailText, ConfigOptions options) {
         ShowcaseView sv = new ShowcaseView(activity);
         if (options != null) {
@@ -653,18 +678,23 @@ public class ShowcaseView extends RelativeLayout
 
     /**
      * Quick method to insert a ShowcaseView into an Activity
-     *
-     * @param viewToShowcase View to showcase
-     * @param activity       Activity to insert into
-     * @param title          Text to show as a title. Can be null.
-     * @param detailText     More detailed text. Can be null.
-     * @param options        A set of options to customise the ShowcaseView
+     * 
+     * @param viewToShowcase
+     *            View to showcase
+     * @param activity
+     *            Activity to insert into
+     * @param title
+     *            Text to show as a title. Can be null.
+     * @param detailText
+     *            More detailed text. Can be null.
+     * @param options
+     *            A set of options to customise the ShowcaseView
      * @return the created ShowcaseView instance
      * @deprecated use insertShowcaseView with {@link Target}
      */
     @Deprecated
-    public static ShowcaseView insertShowcaseView(View viewToShowcase, Activity activity, int title,
-            int detailText, ConfigOptions options) {
+    public static ShowcaseView insertShowcaseView(View viewToShowcase, Activity activity, int title, int detailText,
+            ConfigOptions options) {
         ShowcaseView sv = new ShowcaseView(activity);
         if (options != null) {
             sv.setConfigOptions(options);
@@ -683,34 +713,34 @@ public class ShowcaseView extends RelativeLayout
      * @deprecated use insertShowcaseView with {@link Target}
      */
     @Deprecated
-    public static ShowcaseView insertShowcaseView(int showcaseViewId, Activity activity,
-            String title, String detailText, ConfigOptions options) {
-        View v = activity.findViewById(showcaseViewId);
-        if (v != null) {
-            return insertShowcaseView(v, activity, title, detailText, options);
-        }
-        return null;
-    }
-
-    /**
-     * @deprecated use insertShowcaseView with {@link Target}
-     */
-    @Deprecated
-    public static ShowcaseView insertShowcaseView(int showcaseViewId, Activity activity, int title,
-            int detailText, ConfigOptions options) {
-        View v = activity.findViewById(showcaseViewId);
-        if (v != null) {
-            return insertShowcaseView(v, activity, title, detailText, options);
-        }
-        return null;
-    }
-
-    /**
-     * @deprecated use insertShowcaseView with {@link Target}
-     */
-    @Deprecated
-    public static ShowcaseView insertShowcaseView(int x, int y, Activity activity, String title,
+    public static ShowcaseView insertShowcaseView(int showcaseViewId, Activity activity, String title,
             String detailText, ConfigOptions options) {
+        View v = activity.findViewById(showcaseViewId);
+        if (v != null) {
+            return insertShowcaseView(v, activity, title, detailText, options);
+        }
+        return null;
+    }
+
+    /**
+     * @deprecated use insertShowcaseView with {@link Target}
+     */
+    @Deprecated
+    public static ShowcaseView insertShowcaseView(int showcaseViewId, Activity activity, int title, int detailText,
+            ConfigOptions options) {
+        View v = activity.findViewById(showcaseViewId);
+        if (v != null) {
+            return insertShowcaseView(v, activity, title, detailText, options);
+        }
+        return null;
+    }
+
+    /**
+     * @deprecated use insertShowcaseView with {@link Target}
+     */
+    @Deprecated
+    public static ShowcaseView insertShowcaseView(int x, int y, Activity activity, String title, String detailText,
+            ConfigOptions options) {
         ShowcaseView sv = new ShowcaseView(activity);
         if (options != null) {
             sv.setConfigOptions(options);
@@ -729,8 +759,8 @@ public class ShowcaseView extends RelativeLayout
      * @deprecated use insertShowcaseView with {@link Target}
      */
     @Deprecated
-    public static ShowcaseView insertShowcaseView(int x, int y, Activity activity, int title,
-            int detailText, ConfigOptions options) {
+    public static ShowcaseView insertShowcaseView(int x, int y, Activity activity, int title, int detailText,
+            ConfigOptions options) {
         ShowcaseView sv = new ShowcaseView(activity);
         if (options != null) {
             sv.setConfigOptions(options);
@@ -755,20 +785,28 @@ public class ShowcaseView extends RelativeLayout
 
     /**
      * Quickly insert a ShowcaseView into an Activity, highlighting an item.
-     *
-     * @param type       the type of item to showcase (can be ITEM_ACTION_HOME,
-     *                   ITEM_TITLE_OR_SPINNER, ITEM_ACTION_ITEM or ITEM_ACTION_OVERFLOW)
-     * @param itemId     the ID of an Action item to showcase (only required for ITEM_ACTION_ITEM
-     * @param activity   Activity to insert the ShowcaseView into
-     * @param title      Text to show as a title. Can be null.
-     * @param detailText More detailed text. Can be null.
-     * @param options    A set of options to customise the ShowcaseView
+     * 
+     * @param type
+     *            the type of item to showcase (can be ITEM_ACTION_HOME,
+     *            ITEM_TITLE_OR_SPINNER, ITEM_ACTION_ITEM or
+     *            ITEM_ACTION_OVERFLOW)
+     * @param itemId
+     *            the ID of an Action item to showcase (only required for
+     *            ITEM_ACTION_ITEM
+     * @param activity
+     *            Activity to insert the ShowcaseView into
+     * @param title
+     *            Text to show as a title. Can be null.
+     * @param detailText
+     *            More detailed text. Can be null.
+     * @param options
+     *            A set of options to customise the ShowcaseView
      * @return the created ShowcaseView instance
      * @deprecated use insertShowcaseView with {@link Target}
      */
     @Deprecated
-    public static ShowcaseView insertShowcaseViewWithType(int type, int itemId, Activity activity,
-            String title, String detailText, ConfigOptions options) {
+    public static ShowcaseView insertShowcaseViewWithType(int type, int itemId, Activity activity, String title,
+            String detailText, ConfigOptions options) {
         ShowcaseView sv = new ShowcaseView(activity);
         if (options != null) {
             sv.setConfigOptions(options);
@@ -785,19 +823,27 @@ public class ShowcaseView extends RelativeLayout
 
     /**
      * Quickly insert a ShowcaseView into an Activity, highlighting an item.
-     *
-     * @param type       the type of item to showcase (can be ITEM_ACTION_HOME,
-     *                   ITEM_TITLE_OR_SPINNER, ITEM_ACTION_ITEM or ITEM_ACTION_OVERFLOW)
-     * @param itemId     the ID of an Action item to showcase (only required for ITEM_ACTION_ITEM
-     * @param activity   Activity to insert the ShowcaseView into
-     * @param title      Text to show as a title. Can be null.
-     * @param detailText More detailed text. Can be null.
-     * @param options    A set of options to customise the ShowcaseView
+     * 
+     * @param type
+     *            the type of item to showcase (can be ITEM_ACTION_HOME,
+     *            ITEM_TITLE_OR_SPINNER, ITEM_ACTION_ITEM or
+     *            ITEM_ACTION_OVERFLOW)
+     * @param itemId
+     *            the ID of an Action item to showcase (only required for
+     *            ITEM_ACTION_ITEM
+     * @param activity
+     *            Activity to insert the ShowcaseView into
+     * @param title
+     *            Text to show as a title. Can be null.
+     * @param detailText
+     *            More detailed text. Can be null.
+     * @param options
+     *            A set of options to customise the ShowcaseView
      * @return the created ShowcaseView instance
      */
     @Deprecated
-    public static ShowcaseView insertShowcaseViewWithType(int type, int itemId, Activity activity,
-            int title, int detailText, ConfigOptions options) {
+    public static ShowcaseView insertShowcaseViewWithType(int type, int itemId, Activity activity, int title,
+            int detailText, ConfigOptions options) {
         ShowcaseView sv = new ShowcaseView(activity);
         if (options != null) {
             sv.setConfigOptions(options);
@@ -821,7 +867,7 @@ public class ShowcaseView extends RelativeLayout
      * Internal insert method so all inserts are routed through one method
      */
     private static ShowcaseView insertShowcaseViewInternal(Target target, Activity activity, String title,
-                                                           String detail, ConfigOptions options) {
+            String detail, ConfigOptions options) {
         ShowcaseView sv = new ShowcaseView(activity);
         sv.setConfigOptions(options);
         if (sv.getConfigOptions().insert == INSERT_TO_DECOR) {
@@ -846,60 +892,68 @@ public class ShowcaseView extends RelativeLayout
         return insertShowcaseViewInternal(target, activity, activity.getString(title), activity.getString(detail), null);
     }
 
-    public static ShowcaseView insertShowcaseView(Target target, Activity activity, String title, String detail, ConfigOptions options) {
+    public static ShowcaseView insertShowcaseView(Target target, Activity activity, String title, String detail,
+            ConfigOptions options) {
         return insertShowcaseViewInternal(target, activity, title, detail, options);
     }
 
-    public static ShowcaseView insertShowcaseView(Target target, Activity activity, int title, int detail, ConfigOptions options) {
-        return insertShowcaseViewInternal(target, activity, activity.getString(title), activity.getString(detail), options);
+    public static ShowcaseView insertShowcaseView(Target target, Activity activity, int title, int detail,
+            ConfigOptions options) {
+        return insertShowcaseViewInternal(target, activity, activity.getString(title), activity.getString(detail),
+                options);
     }
 
     public static class ConfigOptions {
 
-        public boolean block = true, noButton = false;
-        public boolean hideOnClickOutside = false;
+        public boolean      block              = true, noButton = false;
+        public boolean      hideOnClickOutside = false;
 
         /**
-         * Does not work with the {@link ShowcaseViews} class as it does not make sense (only with
-         * {@link ShowcaseView}).
+         * Does not work with the {@link ShowcaseViews} class as it does not
+         * make sense (only with {@link ShowcaseView}).
+         * 
          * @deprecated not compatible with Target API
          */
         @Deprecated
-        public int insert = INSERT_TO_DECOR;
+        public int          insert             = INSERT_TO_DECOR;
 
         /**
-         * If you want to use more than one Showcase with the {@link ConfigOptions#shotType} {@link
-         * ShowcaseView#TYPE_ONE_SHOT} in one Activity, set a unique value for every different
-         * Showcase you want to use.
+         * If you want to use more than one Showcase with the
+         * {@link ConfigOptions#shotType} {@link ShowcaseView#TYPE_ONE_SHOT} in
+         * one Activity, set a unique value for every different Showcase you
+         * want to use.
          */
-        public int showcaseId = 0;
+        public int          showcaseId         = 0;
 
         /**
-         * If you want to use more than one Showcase with {@link ShowcaseView#TYPE_ONE_SHOT} in one
-         * Activity, set a unique {@link ConfigOptions#showcaseId} value for every different
-         * Showcase you want to use. If you want to use this in the {@link ShowcaseViews} class, you
-         * need to set a custom showcaseId for each {@link ShowcaseView}.
+         * If you want to use more than one Showcase with
+         * {@link ShowcaseView#TYPE_ONE_SHOT} in one Activity, set a unique
+         * {@link ConfigOptions#showcaseId} value for every different Showcase
+         * you want to use. If you want to use this in the {@link ShowcaseViews}
+         * class, you need to set a custom showcaseId for each
+         * {@link ShowcaseView}.
          */
-        public int shotType = TYPE_NO_LIMIT;
+        public int          shotType           = TYPE_NO_LIMIT;
 
         /**
          * Default duration for fade in animation. Set to 0 to disable.
          */
-        public int fadeInDuration = AnimationUtils.DEFAULT_DURATION;
+        public int          fadeInDuration     = AnimationUtils.DEFAULT_DURATION;
 
         /**
          * Default duration for fade out animation. Set to 0 to disable.
          */
-        public int fadeOutDuration = AnimationUtils.DEFAULT_DURATION;
+        public int          fadeOutDuration    = AnimationUtils.DEFAULT_DURATION;
         /**
          * Allow custom positioning of the button within the showcase view.
          */
         public LayoutParams buttonLayoutParams = null;
-        
+
         /**
-         * Whether the text should be centered or stretched in the available space
+         * Whether the text should be centered or stretched in the available
+         * space
          */
-        public boolean centerText = false;
+        public boolean      centerText         = false;
     }
 
     public float getScaleMultiplier() {
